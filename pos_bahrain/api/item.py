@@ -63,11 +63,13 @@ def get_more_pos_data(profile, company):
         "uom_details": get_uom_details(),
         "exchange_rates": get_exchange_rates(),
         "do_not_allow_zero_payment": settings.do_not_allow_zero_payment,
+        "allow_returns": settings.allow_returns,
         "use_batch_price": settings.use_batch_price,
         "use_barcode_uom": settings.use_barcode_uom,
         "use_custom_item_cart": settings.use_custom_item_cart,
         "use_stock_validator": settings.use_stock_validator,
         "use_sales_employee": settings.show_sales_employee,
+        "override_sync_limit": settings.override_sync_limit,
         "sales_employee_details": _get_employees()
         if settings.show_sales_employee
         else None,
@@ -118,7 +120,9 @@ def _get_barcode_details():
 def _get_item_prices(price_list):
     prices = frappe.db.sql(
         """
-            SELECT item_code, uom, customer, currency, price_list_rate
+            SELECT
+                item_code, currency, price_list_rate,
+                uom, customer, min_qty, valid_from, valid_upto
             FROM `tabItem Price` WHERE price_list = %(price_list)s
         """,
         values={"price_list": price_list},
