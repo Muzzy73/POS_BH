@@ -15,9 +15,9 @@ with open('pos_bahrain/__init__.py', 'rb') as f:
 setup(
 	name='pos_bahrain',
 	version=version,
-	description='Pos Customization',
-	author='	9t9it',
-	author_email='hafeesk@gmail.com',
+	description='POS Customization',
+	author='9t9it',
+	author_email='info@9t9it.com',
 	packages=find_packages(),
 	zip_safe=False,
 	include_package_data=True,
