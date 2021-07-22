@@ -4,12 +4,12 @@ from . import __version__
 
 app_name = "pos_bahrain"
 app_version = __version__
-app_title = "Pos Bahrain"
-app_publisher = "	9t9it"
-app_description = "Pos Customization"
+app_title = "POS Bahrain"
+app_publisher = "9T9 IT"
+app_description = "POS Customization"
 app_icon = "octicon octicon-file-directory"
 app_color = "grey"
-app_email = "hafeesk@gmail.com"
+app_email = "info@9t9it.com"
 app_license = "MIT"
 
 # Includes in <head>
