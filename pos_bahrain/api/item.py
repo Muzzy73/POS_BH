@@ -4,7 +4,13 @@ import frappe
 from frappe import _
 from frappe.utils import today
 from frappe.desk.reportview import get_filters_cond
-from erpnext.stock.get_item_details import get_item_price
+from erpnext.stock.get_item_details import (
+    get_item_price,
+    get_batch_qty,
+    get_default_cost_center,
+)
+from erpnext.stock.doctype.item.item import get_item_defaults
+from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from functools import partial
 from toolz import groupby, merge, valmap, compose, get, excepts, first, pluck
 
@@ -63,6 +69,7 @@ def get_more_pos_data(profile, company):
         "uom_details": get_uom_details(),
         "exchange_rates": get_exchange_rates(),
         "do_not_allow_zero_payment": settings.do_not_allow_zero_payment,
+        "enforce_full_payment": settings.enforce_full_payment,
         "allow_returns": settings.allow_returns,
         "use_batch_price": settings.use_batch_price,
         "use_barcode_uom": settings.use_barcode_uom,
@@ -70,9 +77,11 @@ def get_more_pos_data(profile, company):
         "use_stock_validator": settings.use_stock_validator,
         "use_sales_employee": settings.show_sales_employee,
         "override_sync_limit": settings.override_sync_limit,
+        "customer_contacts": _get_customer_contacts(),
         "sales_employee_details": _get_employees()
         if settings.show_sales_employee
         else None,
+        "mode_of_payment_details": _get_mop_details(),
     }
 
 
@@ -208,6 +217,16 @@ def get_exchange_rates():
     }
 
 
+def _get_mop_details():
+    return frappe.db.sql(
+        """
+            SELECT name, pb_bank_method FROM `tabMode of Payment`
+            WHERE type = 'Bank' AND IFNULL(pb_bank_method, '') != ''
+        """,
+        as_dict=1,
+    )
+
+
 @frappe.whitelist()
 def get_retail_price(item_code):
     retail_price_list = frappe.db.get_value(
@@ -295,18 +314,131 @@ def get_item_rate(item_code, uom, price_list="Standard Selling"):
     )
 
     return get_price(
-        {"price_list": price_list, "uom": uom, "transaction_date": today()}, item_code,
+        {"price_list": price_list, "uom": uom, "transaction_date": today()},
+        item_code,
     )
 
 
 @frappe.whitelist()
-def get_supplier_items(supplier, company=None):
-    items = frappe.get_all(
-        "Item Default",
-        filters={
-            "default_supplier": supplier,
-            "company": company or frappe.defaults.get_user_default("company"),
-        },
-        fields=["parent"],
+def get_actual_qty(item_code, warehouse, batch=None):
+    has_batch_no = frappe.db.get_value("Item", item_code, "has_batch_no")
+    if has_batch_no and batch:
+        batch_qty = get_batch_qty(batch, warehouse, item_code) or {}
+        return batch_qty.get("actual_batch_qty", 0)
+    return (
+        frappe.db.get_value(
+            "Bin", {"item_code": item_code, "warehouse": warehouse}, "actual_qty"
+        )
+        or 0
     )
-    return [x.get("parent") for x in items]
+
+
+@frappe.whitelist()
+def search_serial_or_batch_or_barcode_number(search_value):
+    from erpnext.selling.page.point_of_sale.point_of_sale import (
+        search_serial_or_batch_or_barcode_number,
+    )
+
+    item_code = frappe.db.get_value(
+        "Item", search_value, ["name as item_code"], as_dict=True
+    )
+    if item_code:
+        return item_code
+
+    result = search_serial_or_batch_or_barcode_number(search_value)
+    if result and result.get("batch_no"):
+        return merge(
+            result,
+            {
+                "pb_expiry_date": frappe.db.get_value(
+                    "Batch", result.get("batch_no"), "expiry_date"
+                )
+            },
+        )
+    return result or None
+
+
+@frappe.whitelist()
+def get_standard_prices(item_code):
+    buying_price_list = frappe.db.get_single_value(
+        "Buying Settings", "buying_price_list"
+    )
+    selling_price_list = frappe.db.get_single_value(
+        "Selling Settings", "selling_price_list"
+    )
+    stock_uom = frappe.db.get_value("Item", item_code, "stock_uom")
+
+    get_price = compose(
+        lambda x: x.get("price_list_rate"),
+        excepts(StopIteration, first, lambda _0: {}),
+        lambda x: frappe.db.sql(
+            """
+                SELECT price_list_rate FROM `tabItem Price`
+                WHERE
+                    item_code = %(item_code)s AND
+                    price_list = %(price_list)s AND
+                    IFNULL(uom, '') IN ('', %(stock_uom)s) AND
+                    IFNULL(customer, '') = ''
+            """,
+            values={"item_code": item_code, "price_list": x, "stock_uom": stock_uom},
+            as_dict=1,
+        ),
+    )
+
+    return {
+        "selling_price": get_price(selling_price_list),
+        "buying_price": get_price(buying_price_list),
+    }
+
+
+@frappe.whitelist()
+def get_one_batch(item_code):
+    batches = frappe.db.get_all("Batch", {"item": item_code})
+    if len(batches) == 1:
+        return batches[0].get("name")
+    return None
+
+
+@frappe.whitelist()
+def get_item_cost_center(item_code=None, company=None, project=None, customer=None):
+    cost_center = frappe.get_cached_value("Company", company, "cost_center")
+    if not item_code:
+        return cost_center
+    item_defaults = get_item_defaults(item_code, company)
+    item_group_defaults = get_item_group_defaults(item_code, company)
+    args = {
+        "project": project,
+        "customer": customer,
+        "cost_center": cost_center,
+    }
+    return get_default_cost_center(args, item_defaults, item_group_defaults, company)
+
+
+def _get_customer_contacts():
+    dynamic_links = {
+        x.get("parent"): x.get("link_name")
+        for x in frappe.db.sql(
+            """
+            SELECT parent, link_name FROM `tabDynamic Link`
+            WHERE link_doctype = 'Customer'
+            AND parenttype = 'Contact'
+            """,
+            as_dict=1,
+        )
+    }
+
+    phone_contacts = {
+        x.get("name"): x.get("phone", "")
+        for x in frappe.db.sql(
+            """
+            SELECT name, phone 
+            FROM `tabContact`
+            """,
+            as_dict=1,
+        )
+    }
+
+    return {
+        customer: phone_contacts.get(contact, "")
+        for contact, customer in dynamic_links.items()
+    }

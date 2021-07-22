@@ -4,14 +4,17 @@
 
 from __future__ import unicode_literals
 import frappe
+from frappe.utils import nowtime
 
 
 def before_save(doc, method):
+    if not doc.pb_posting_time:
+        doc.pb_posting_time = nowtime()
     for ref in doc.references:
         if not ref.pb_invoice_date:
             date_field = (
                 "transaction_date"
-                if ref.reference_doctype == "Sales Order"
+                if ref.reference_doctype in ["Sales Order", "Purchase Order"]
                 else "posting_date"
             )
             ref.pb_invoice_date = frappe.db.get_value(

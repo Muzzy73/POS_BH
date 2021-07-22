@@ -10,5 +10,13 @@ export { default as payment_entry } from './payment_entry';
 export { default as item_price } from './item_price';
 export { default as pos_bahrain_settings } from './pos_bahrain_settings';
 export { default as barcode_print } from './barcode_print';
+export { default as item } from './item';
+export { default as backported_stock_reconciliation } from './backported_stock_reconciliation';
+export { default as payment_entry_pb } from './payment_entry_pb';
+export { default as gl_payment } from './gl_payment';
+export { default as batch_recall } from './batch_recall';
+
 import * as extensions from './extensions';
-export { extensions };
+import stock_transfer, { stock_transfer_item } from './stock_transfer';
+
+export { extensions, stock_transfer, stock_transfer_item };
