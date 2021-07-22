@@ -1,19 +1,19 @@
 {
-  "name": "pos_bahrain",
+  "name": "pos_bh",
   "version": "0.4.3",
-  "description": "## Pos Enhancement over the default POS of ERPNext",
+  "description": "## POS Enhancement over the default ERPNext POS",
   "main": "pos_bahrain/public/js/index.js",
   "scripts": {
     "version": "sed -i \"s/__version__.*/__version__ = \\\"$npm_package_version\\\"/\" $npm_package_name/__init__.py; git add -A $npm_package_name/__init__.py"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/f-9t9it/pos_bahrain.git"
-  },
-  "author": "Sun Howwrongbum <sun@libermatic.com>",
+    "url": "git+https://github.com/Muzzy73/POS_BH.git"
+    },
+  "author": "Muzammil Nasir <m.nasir@9t9it.com.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/f-9t9it/pos_bahrain/issues"
+    "url": "https://github.com/Muzzy73/POS_BH/issues"
   },
-  "homepage": "https://github.com/f-9t9it/pos_bahrain#readme"
+  "homepage": "https://github.com/Muzzy73/POS_BH#readme"
 }
