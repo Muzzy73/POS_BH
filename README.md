@@ -1,4 +1,4 @@
-## POS Bahrain
+## POS BH
 
 ## POS Enhancement over the default ERPNext POS
 
